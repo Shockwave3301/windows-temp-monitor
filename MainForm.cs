@@ -10,35 +10,38 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using LibreHardwareMonitor.Hardware;
+using Microsoft.Win32;
 
 namespace TempMonitor
 {
     internal sealed class MainForm : Form
     {
         private const int RefreshMs = 1000;
-        private const float WarmC = 70f;
-        private const float HotC = 85f;
+
+        /// <summary>Set by "--theme dark|light" to override the Windows setting.</summary>
+        public static bool? ForcedDark;
+
+        /// <summary>Set by "--snapshot file.png": render the window to an image after a few seconds, then exit.</summary>
+        public static string SnapshotPath;
 
         private readonly float _scale;
         private readonly Settings _settings = Settings.Load();
         private readonly bool _isAdmin = IsRunningAsAdmin();
+        private readonly UiFonts _fonts;
+        private Theme _theme;
 
-        private readonly ListView _list;
-        private readonly ToolStripStatusLabel _status;
-        private readonly Panel _banner;
-        private readonly Label _bannerText;
-        private readonly Button _bannerButton;
-        private readonly ToolStripMenuItem _fahrenheitItem;
+        private readonly HeaderView _header;
+        private readonly DashboardView _dashboard;
+        private readonly ContextMenuStrip _menu;
         private readonly ToolStripMenuItem _topMostItem;
 
-        private readonly Dictionary<string, ListViewItem> _rows = new Dictionary<string, ListViewItem>();
-        private readonly Dictionary<string, ListViewGroup> _groups = new Dictionary<string, ListViewGroup>();
         private List<Reading> _lastReadings = new List<Reading>();
+        private List<DeviceCard> _lastCards = new List<DeviceCard>();
+        private bool _installing;
 
         private readonly Computer _computer = Sensors.CreateComputer();
         private readonly ManualResetEvent _stop = new ManualResetEvent(false);
         private Thread _worker;
-        private volatile bool _resetRequested;
         private bool _restartOnClose;
 
         public static string AppVersion
@@ -56,82 +59,96 @@ namespace TempMonitor
             // and Windows would then ignore StartPosition.
             using (Graphics g = Graphics.FromHwnd(IntPtr.Zero))
                 _scale = g.DpiX / 96f;
+            _fonts = new UiFonts(_scale);
 
-            Text = "Temp Monitor " + AppVersion;
+            Text = "Temp Monitor";
             AutoScaleMode = AutoScaleMode.None;
             Font = SystemFonts.MessageBoxFont;
-            ClientSize = Px(600, 560);
-            MinimumSize = Px(380, 260);
+            ClientSize = Px(480, 720);
+            MinimumSize = Px(360, 320);
             StartPosition = FormStartPosition.CenterScreen;
+            KeyPreview = true;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
-            // --- menu ---
-            var menu = new MenuStrip();
-            _fahrenheitItem = new ToolStripMenuItem("Show in &Fahrenheit (°F)", null, (s, e) => ToggleFahrenheit()) { Checked = _settings.Fahrenheit };
-            _topMostItem = new ToolStripMenuItem("Always on &top", null, (s, e) => ToggleTopMost()) { Checked = _settings.TopMost };
-            menu.Items.Add(new ToolStripMenuItem("&View", null, _fahrenheitItem, _topMostItem));
-            menu.Items.Add(new ToolStripMenuItem("&Sensors", null,
-                new ToolStripMenuItem("&Reset min/max", null, (s, e) => _resetRequested = true),
-                new ToolStripMenuItem("&Copy readings", null, (s, e) => CopyReadings()) { ShortcutKeys = Keys.Control | Keys.C }));
-            menu.Items.Add(new ToolStripMenuItem("&Help", null,
-                new ToolStripMenuItem("&PawnIO driver website", null, (s, e) => OpenUrl(PawnIo.Website)),
-                new ToolStripMenuItem("&About Temp Monitor", null, (s, e) => ShowAbout())));
-            MainMenuStrip = menu;
+            _header = new HeaderView(_scale) { Dock = DockStyle.Top, Fahrenheit = _settings.Fahrenheit };
+            _header.UnitChanged += f => { _settings.Fahrenheit = f; _settings.Save(); _dashboard.Fahrenheit = f; Render(false); };
+            _header.MenuRequested += pt => _menu.Show(pt, ToolStripDropDownDirection.BelowLeft);
 
-            // --- banner shown when CPU sensors can't be read ---
-            _banner = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = Px(44),
-                BackColor = SystemColors.Info,
-                Padding = new Padding(Px(8), Px(6), Px(8), Px(6)),
-                Visible = false,
-            };
-            _bannerButton = new Button { Text = "Install PawnIO…", AutoSize = true, Dock = DockStyle.Right, UseVisualStyleBackColor = true };
-            _bannerButton.Click += async (s, e) => await InstallPawnIoAsync();
-            _bannerText = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, ForeColor = SystemColors.InfoText, AutoEllipsis = true };
-            _banner.Controls.Add(_bannerText);
-            _banner.Controls.Add(_bannerButton);
+            _dashboard = new DashboardView(_scale, _settings.Collapsed) { Dock = DockStyle.Fill, Fahrenheit = _settings.Fahrenheit };
+            _dashboard.CardToggled += key => { _dashboard.ToggleCollapsed(key); _settings.Save(); };
+            _dashboard.NoticeClicked += async () => await InstallPawnIoAsync();
 
-            // --- sensor list ---
-            _list = new DoubleBufferedListView
-            {
-                Dock = DockStyle.Fill,
-                View = View.Details,
-                FullRowSelect = true,
-                HeaderStyle = ColumnHeaderStyle.Nonclickable,
-                ShowGroups = true,
-                BorderStyle = BorderStyle.None,
-            };
-            _list.Columns.Add("Sensor", Px(280));
-            _list.Columns.Add("Current", Px(85), HorizontalAlignment.Right);
-            _list.Columns.Add("Min", Px(85), HorizontalAlignment.Right);
-            _list.Columns.Add("Max", Px(85), HorizontalAlignment.Right);
-            _list.Resize += (s, e) => FitFirstColumn();
-
-            // --- status bar ---
-            var statusStrip = new StatusStrip();
-            _status = new ToolStripStatusLabel("Detecting sensors…") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
-            statusStrip.Items.Add(_status);
+            _topMostItem = new ToolStripMenuItem("Always on top", null, (s, e) => ToggleTopMost()) { Checked = _settings.TopMost };
+            _menu = new ContextMenuStrip { ShowImageMargin = false, ShowCheckMargin = true, Font = _fonts.Body };
+            _menu.Items.Add(_topMostItem);
+            _menu.Items.Add(new ToolStripMenuItem("Reset min/max", null, (s, e) => { Cards.ResetMinMax(); Render(false); }));
+            _menu.Items.Add(new ToolStripMenuItem("Copy readings", null, (s, e) => CopyReadings()) { ShortcutKeyDisplayString = "Ctrl+C" });
+            _menu.Items.Add(new ToolStripSeparator());
+            _menu.Items.Add(new ToolStripMenuItem("PawnIO driver website", null, (s, e) => OpenUrl(PawnIo.Website)));
+            _menu.Items.Add(new ToolStripMenuItem("About Temp Monitor", null, (s, e) => ShowAbout()));
+            foreach (ToolStripItem item in _menu.Items) item.Padding = new Padding(Px(4), Px(4), Px(4), Px(4));
 
             // Dock order: the first control added fills what the later ones leave.
-            Controls.AddRange(new Control[] { _list, _banner, menu, statusStrip });
+            Controls.Add(_dashboard);
+            Controls.Add(_header);
 
             TopMost = _settings.TopMost;
             RestoreWindowBounds();
-            UpdateBanner();
+            ApplyTheme();
+            UpdateNotice();
+            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            if (_theme != null) Theme.ApplyTitleBar(Handle, _theme.Dark);
         }
 
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            FitFirstColumn();
             _worker = new Thread(WorkerLoop) { IsBackground = true, Name = "SensorPoller" };
             _worker.Start();
+
+            if (SnapshotPath != null)
+            {
+                var timer = new System.Windows.Forms.Timer { Interval = 8000 };
+                timer.Tick += (s, ev) => { timer.Stop(); SaveSnapshot(SnapshotPath); Close(); };
+                timer.Start();
+            }
+        }
+
+        private void SaveSnapshot(string path)
+        {
+            try
+            {
+                // Full content, not just what fits in the window.
+                // Opaque bitmap: ClearType text renders badly onto a transparent one.
+                int w = ClientSize.Width;
+                using (var bmp = new Bitmap(w, _header.Height + _dashboard.ContentHeight(w), System.Drawing.Imaging.PixelFormat.Format24bppRgb))
+                {
+                    _header.DrawToBitmap(bmp, new Rectangle(0, 0, w, _header.Height));
+                    using (Graphics g = Graphics.FromImage(bmp))
+                    {
+                        g.TranslateTransform(0, _header.Height);
+                        _dashboard.RenderAll(g, w);
+                    }
+                    bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+            catch { }
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (e.Control && e.KeyCode == Keys.C) { CopyReadings(); e.Handled = true; }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
             _settings.WindowBounds = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
             _settings.Save();
 
@@ -151,6 +168,28 @@ namespace TempMonitor
             }
         }
 
+        // ---------- theme ----------
+
+        private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            if (e.Category != UserPreferenceCategory.General && e.Category != UserPreferenceCategory.Color &&
+                e.Category != UserPreferenceCategory.Accessibility) return;
+            try { BeginInvoke((Action)ApplyTheme); } catch (InvalidOperationException) { }
+        }
+
+        private void ApplyTheme()
+        {
+            Theme theme = Theme.Current(ForcedDark);
+            _theme = theme;
+
+            BackColor = theme.Background;
+            _header.SetTheme(theme, _fonts);
+            _dashboard.SetTheme(theme, _fonts);
+            _menu.Renderer = new ThemedMenuRenderer(theme);
+            _menu.BackColor = theme.Card;
+            if (IsHandleCreated) Theme.ApplyTitleBar(Handle, theme.Dark);
+        }
+
         // ---------- worker thread ----------
 
         private void WorkerLoop()
@@ -161,7 +200,7 @@ namespace TempMonitor
             }
             catch (Exception ex)
             {
-                PostStatus("Could not open hardware sensors: " + ex.Message);
+                PostSummary("Could not read hardware sensors", ex.Message);
                 return;
             }
 
@@ -169,103 +208,114 @@ namespace TempMonitor
             {
                 try
                 {
-                    if (_resetRequested)
-                    {
-                        _resetRequested = false;
-                        Sensors.ResetMinMax(_computer);
-                    }
-
                     List<Reading> readings = Sensors.ReadAll(_computer);
                     if (_stop.WaitOne(0)) break;
-                    PostReadings(readings);
+                    try { BeginInvoke((Action)(() => OnReadings(readings))); }
+                    catch (InvalidOperationException) { } // window is closing
                 }
                 catch (Exception ex)
                 {
-                    PostStatus("Sensor error: " + ex.Message);
+                    PostSummary("Sensor error", ex.Message);
                 }
             }
             while (!_stop.WaitOne(RefreshMs));
         }
 
-        private void PostReadings(List<Reading> readings)
+        private void PostSummary(string title, string subtitle)
         {
-            try { BeginInvoke((Action)(() => ShowReadings(readings))); }
-            catch (InvalidOperationException) { } // window is closing
-        }
-
-        private void PostStatus(string text)
-        {
-            try { BeginInvoke((Action)(() => _status.Text = text)); }
+            try { BeginInvoke((Action)(() => _header.SetSummary(title, subtitle, Status.Unknown))); }
             catch (InvalidOperationException) { }
         }
 
         // ---------- UI thread ----------
 
-        private void ShowReadings(List<Reading> readings)
+        private void OnReadings(List<Reading> readings)
         {
             if (IsDisposed) return;
             _lastReadings = readings;
-
-            _list.BeginUpdate();
-            try
-            {
-                foreach (Reading r in readings)
-                {
-                    ListViewGroup group;
-                    if (!_groups.TryGetValue(r.GroupKey, out group))
-                    {
-                        group = new ListViewGroup(r.GroupKey, r.GroupName);
-                        _groups[r.GroupKey] = group;
-                        _list.Groups.Add(group);
-                    }
-
-                    ListViewItem row;
-                    if (!_rows.TryGetValue(r.Id, out row))
-                    {
-                        row = new ListViewItem(new[] { r.Name, "", "", "" }, group) { UseItemStyleForSubItems = true };
-                        _rows[r.Id] = row;
-                        _list.Items.Add(row);
-                    }
-
-                    SetText(row.SubItems[1], Format(r.Value));
-                    SetText(row.SubItems[2], Format(r.Min));
-                    SetText(row.SubItems[3], Format(r.Max));
-
-                    Color color = !r.Value.HasValue ? SystemColors.GrayText
-                                : r.Value.Value >= HotC ? Color.Firebrick
-                                : r.Value.Value >= WarmC ? Color.DarkOrange
-                                : SystemColors.WindowText;
-                    if (row.ForeColor != color) row.ForeColor = color;
-                }
-            }
-            finally
-            {
-                _list.EndUpdate();
-            }
-
-            if (readings.Count == 0)
-                _status.Text = "No temperature sensors found.";
-            else
-                _status.Text = readings.Count + " temperature sensors · updated " + DateTime.Now.ToString("T", CultureInfo.CurrentCulture);
+            Render(true);
         }
 
-        private void UpdateBanner()
+        /// <param name="newSample">True only for a fresh poll; false just redraws the last one.</param>
+        private void Render(bool newSample)
         {
+            _lastCards = Cards.Build(_lastReadings, newSample);
+            _dashboard.SetCards(_lastCards);
+            UpdateSummary(_lastCards);
+        }
+
+        private void UpdateSummary(List<DeviceCard> cards)
+        {
+            string time = DateTime.Now.ToString("T", CultureInfo.CurrentCulture);
+            if (cards.Count == 0)
+            {
+                _header.SetSummary(_lastReadings.Count == 0 ? "Detecting sensors…" : "No temperature sensors found", "", Status.Unknown);
+                return;
+            }
+
+            Status worst = Status.Unknown;
+            foreach (DeviceCard c in cards) if (c.Status > worst) worst = c.Status;
+            var worstCards = cards.FindAll(c => c.Status == worst);
+
+            string title;
+            if (worst == Status.Hot || worst == Status.Warm)
+            {
+                string word = worst == Status.Hot ? "hot" : "warm";
+                title = worstCards.Count == 1
+                    ? worstCards[0].KindLabel + " is running " + word
+                    : worstCards.Count + " devices are running " + word;
+            }
+            else if (worst == Status.Normal)
+            {
+                title = "All temperatures are normal";
+            }
+            else
+            {
+                title = "No temperature readings yet";
+            }
+
+            SensorView hottest = null;
+            foreach (DeviceCard c in cards)
+            {
+                var all = new List<SensorView>(c.Others) { c.Primary };
+                foreach (SensorView s in all)
+                    if (s.Value.HasValue && (hottest == null || s.Value > hottest.Value)) hottest = s;
+            }
+
+            string subtitle = hottest != null
+                ? "Hottest: " + hottest.Name + " " + Rounded(hottest.Value.Value) + "  ·  Updated " + time
+                : "Updated " + time;
+            _header.SetSummary(title, subtitle, worst);
+        }
+
+        private void UpdateNotice()
+        {
+            _dashboard.UnavailableReason = !_isAdmin ? "Needs administrator rights to read this device."
+                                         : !PawnIo.IsInstalled ? "Needs the PawnIO driver to read this device."
+                                         : "No readings from this device.";
             if (!_isAdmin)
             {
-                _bannerText.Text = "Not running as administrator, so CPU and motherboard temperatures are unavailable.";
-                _bannerButton.Visible = false;
-                _banner.Visible = true;
+                _dashboard.SetNotice(new Notice
+                {
+                    Title = "Running without administrator rights",
+                    Body = "CPU and motherboard temperatures need administrator access. Close the app and open it again, then choose Yes when Windows asks.",
+                });
             }
             else if (!PawnIo.IsInstalled)
             {
-                _bannerText.Text = "CPU and motherboard temperatures need the free PawnIO driver.";
-                _bannerButton.Visible = true;
-                _banner.Visible = true;
+                _dashboard.SetNotice(new Notice
+                {
+                    Title = "CPU temperatures need a driver",
+                    Body = _installing
+                        ? "Installing PawnIO… follow the steps in the installer window."
+                        : "Temp Monitor uses PawnIO, a free, signed driver, to read CPU and motherboard sensors. GPU and drive temperatures work without it.",
+                    Button = _installing ? "Installing…" : "Install PawnIO",
+                    ButtonEnabled = !_installing,
+                });
             }
             else
             {
-                _banner.Visible = false;
+                _dashboard.SetNotice(null);
             }
         }
 
@@ -279,8 +329,8 @@ namespace TempMonitor
                 "Install PawnIO", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (answer != DialogResult.Yes) return;
 
-            _bannerButton.Enabled = false;
-            _bannerText.Text = "Downloading and running the PawnIO installer…";
+            _installing = true;
+            UpdateNotice();
             try
             {
                 int exitCode = await Task.Run(() => PawnIo.DownloadAndInstall());
@@ -301,15 +351,8 @@ namespace TempMonitor
                     "\n\nYou can install it manually from " + PawnIo.Website + ".",
                     "Install PawnIO", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            _bannerButton.Enabled = true;
-            UpdateBanner();
-        }
-
-        private void ToggleFahrenheit()
-        {
-            _settings.Fahrenheit = _fahrenheitItem.Checked = !_settings.Fahrenheit;
-            _settings.Save();
-            if (_lastReadings.Count > 0) ShowReadings(_lastReadings);
+            _installing = false;
+            UpdateNotice();
         }
 
         private void ToggleTopMost()
@@ -323,14 +366,21 @@ namespace TempMonitor
         {
             var sb = new StringBuilder();
             sb.AppendLine("Temp Monitor " + AppVersion + " · " + DateTime.Now.ToString("g", CultureInfo.CurrentCulture));
-            string lastGroup = null;
-            foreach (Reading r in _lastReadings)
+            foreach (DeviceCard c in _lastCards)
             {
-                if (r.GroupName != lastGroup) { sb.AppendLine(); sb.AppendLine(r.GroupName); lastGroup = r.GroupName; }
-                sb.AppendLine("  " + r.Name + ": " + Format(r.Value) + "  (min " + Format(r.Min) + ", max " + Format(r.Max) + ")");
+                sb.AppendLine();
+                sb.AppendLine(c.KindLabel + ": " + c.Name);
+                var all = new List<SensorView> { c.Primary };
+                all.AddRange(c.Others);
+                foreach (SensorView s in all)
+                    sb.AppendLine("  " + s.Name + ": " + FormatTemp(s.Value) + "  (min " + FormatTemp(s.Min) + ", max " + FormatTemp(s.Max) + ")");
             }
-            try { Clipboard.SetText(sb.ToString()); _status.Text = "Readings copied to the clipboard."; }
-            catch (Exception ex) { _status.Text = "Could not copy: " + ex.Message; }
+            try
+            {
+                Clipboard.SetText(sb.ToString());
+                _header.SetSummary("Readings copied to the clipboard", "", Status.Unknown);
+            }
+            catch { }
         }
 
         private void ShowAbout()
@@ -360,7 +410,7 @@ namespace TempMonitor
             }
         }
 
-        private string Format(float? celsius)
+        private string FormatTemp(float? celsius)
         {
             if (!celsius.HasValue) return "—";
             float v = celsius.Value;
@@ -369,17 +419,10 @@ namespace TempMonitor
                 : v.ToString("0.0", CultureInfo.CurrentCulture) + " °C";
         }
 
-        private static void SetText(ListViewItem.ListViewSubItem item, string text)
+        private string Rounded(float celsius)
         {
-            if (item.Text != text) item.Text = text;
-        }
-
-        private void FitFirstColumn()
-        {
-            if (_list.Columns.Count < 4) return;
-            int others = _list.Columns[1].Width + _list.Columns[2].Width + _list.Columns[3].Width;
-            int w = _list.ClientSize.Width - others - System.Windows.Forms.SystemInformation.VerticalScrollBarWidth;
-            if (w > Px(120)) _list.Columns[0].Width = w;
+            float v = _settings.Fahrenheit ? celsius * 9f / 5f + 32f : celsius;
+            return Math.Round(v).ToString("0", CultureInfo.CurrentCulture) + (_settings.Fahrenheit ? " °F" : " °C");
         }
 
         private int Px(int logical) { return (int)Math.Round(logical * _scale); }
@@ -401,14 +444,6 @@ namespace TempMonitor
             catch
             {
                 return false;
-            }
-        }
-
-        private sealed class DoubleBufferedListView : ListView
-        {
-            public DoubleBufferedListView()
-            {
-                SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
             }
         }
     }

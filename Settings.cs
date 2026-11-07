@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using Microsoft.Win32;
@@ -13,6 +14,7 @@ namespace TempMonitor
         public bool Fahrenheit;
         public bool TopMost;
         public Rectangle? WindowBounds;
+        public HashSet<string> Collapsed = new HashSet<string>(); // hardware keys of collapsed cards
 
         public static Settings Load()
         {
@@ -25,6 +27,9 @@ namespace TempMonitor
                     s.Fahrenheit = Convert.ToInt32(key.GetValue("Fahrenheit", 0)) != 0;
                     s.TopMost = Convert.ToInt32(key.GetValue("TopMost", 0)) != 0;
                     s.WindowBounds = ParseRect(key.GetValue("WindowBounds") as string);
+                    string collapsed = key.GetValue("Collapsed") as string;
+                    if (!string.IsNullOrEmpty(collapsed))
+                        s.Collapsed = new HashSet<string>(collapsed.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries));
                 }
             }
             catch { }
@@ -39,6 +44,7 @@ namespace TempMonitor
                 {
                     key.SetValue("Fahrenheit", Fahrenheit ? 1 : 0, RegistryValueKind.DWord);
                     key.SetValue("TopMost", TopMost ? 1 : 0, RegistryValueKind.DWord);
+                    key.SetValue("Collapsed", string.Join("|", Collapsed));
                     if (WindowBounds.HasValue)
                     {
                         Rectangle r = WindowBounds.Value;

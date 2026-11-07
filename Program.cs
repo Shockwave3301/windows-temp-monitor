@@ -18,6 +18,15 @@ namespace TempMonitor
             if (args.Length >= 2 && args[0] == "--dump")
                 return Dump(args[1]);
 
+            // TempMonitor.exe --theme dark|light  : ignore the Windows light/dark setting.
+            for (int i = 0; i + 1 < args.Length; i++)
+            {
+                if (args[i] == "--theme")
+                    MainForm.ForcedDark = args[i + 1] == "dark" ? true : args[i + 1] == "light" ? (bool?)false : null;
+                else if (args[i] == "--snapshot")
+                    MainForm.SnapshotPath = args[i + 1]; // render the window to a PNG after a few seconds, then exit
+            }
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);

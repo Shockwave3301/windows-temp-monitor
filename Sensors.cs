@@ -40,23 +40,6 @@ namespace TempMonitor
             return readings;
         }
 
-        public static void ResetMinMax(Computer computer)
-        {
-            foreach (IHardware hw in computer.Hardware)
-                ResetMinMax(hw);
-        }
-
-        private static void ResetMinMax(IHardware hw)
-        {
-            foreach (ISensor s in hw.Sensors)
-            {
-                s.ResetMin();
-                s.ResetMax();
-            }
-            foreach (IHardware sub in hw.SubHardware)
-                ResetMinMax(sub);
-        }
-
         private static void Collect(IHardware hw, IHardware parent, List<Reading> output)
         {
             try { hw.Update(); } catch { return; }
