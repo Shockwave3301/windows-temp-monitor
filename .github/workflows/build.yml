@@ -1,7 +1,8 @@
 name: Build
 
 # Every push and pull request builds the exe and keeps it as a workflow artifact.
-# Pushing a tag like v1.2.0 also publishes a GitHub Release with the exe and its SHA-256.
+# Pushing a tag like v1.2.0 also publishes a GitHub Release with the exe and its SHA-256
+# (or attaches them to that tag's release if one was already created on GitHub).
 on:
   push:
     branches: [main]
@@ -16,9 +17,9 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
 
@@ -45,13 +46,25 @@ jobs:
           "$hash  TempMonitor.exe" | Out-File -Encoding ascii dist/SHA256SUMS.txt
           Get-Content dist/SHA256SUMS.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: TempMonitor
           path: dist/
 
+      # Attaches the files to the tag's release, creating the release if it doesn't exist yet
+      # (it may already exist if it was drafted on GitHub before the tag was pushed).
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" dist/TempMonitor.exe dist/SHA256SUMS.txt --title "Temp Monitor ${{ github.ref_name }}" --generate-notes
+          TAG: ${{ github.ref_name }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG dist/TempMonitor.exe dist/SHA256SUMS.txt --clobber
+          } else {
+            gh release create $env:TAG dist/TempMonitor.exe dist/SHA256SUMS.txt --title "Temp Monitor $env:TAG" --generate-notes
+          }
+          exit $LASTEXITCODE
