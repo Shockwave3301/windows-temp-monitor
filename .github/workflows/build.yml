@@ -65,6 +65,15 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             gh release upload $env:TAG dist/TempMonitor.exe dist/SHA256SUMS.txt --clobber
           } else {
-            gh release create $env:TAG dist/TempMonitor.exe dist/SHA256SUMS.txt --title "Temp Monitor $env:TAG" --generate-notes
+            # A short description for people (and search engines) landing on the release page.
+            # GitHub puts the generated changelog after it.
+            $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+            @(
+              'Temp Monitor is a free, portable app that shows live CPU, GPU, SSD, motherboard and RAM temperatures on Windows 10 and 11.'
+              ''
+              '**Download `TempMonitor.exe` below and run it.** There is nothing to install. Click **Yes** when Windows asks for administrator permission; first-run steps are in the [README](https://github.com/' + $env:GITHUB_REPOSITORY + '#first-run).'
+              ''
+            ) | Set-Content -Encoding utf8 $notes
+            gh release create $env:TAG dist/TempMonitor.exe dist/SHA256SUMS.txt --title "Temp Monitor $env:TAG" --notes-file $notes --generate-notes
           }
           exit $LASTEXITCODE
