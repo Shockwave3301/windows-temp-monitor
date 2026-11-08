@@ -25,12 +25,22 @@
 
 Download [`TempMonitor.exe`](https://github.com/Shockwave3301/windows-temp-monitor/releases/latest/download/TempMonitor.exe) from the [latest release](https://github.com/Shockwave3301/windows-temp-monitor/releases/latest) and run it. There's nothing to install; you can keep the file anywhere.
 
-Each release also lists the file's SHA-256 checksum in `SHA256SUMS.txt`.
+### Is it safe?
+
+Yes, and you can check for yourself:
+
+- **Open source.** All of the code is in this repository.
+- **Built by GitHub, not on someone's PC.** Every release is compiled by [GitHub Actions](.github/workflows/build.yml) from the public source and comes with a signed [build provenance attestation](https://github.com/Shockwave3301/windows-temp-monitor/attestations), which proves the exe was built from this repository.
+- **Scanned by VirusTotal.** Each release page links to the [VirusTotal](https://www.virustotal.com) report for that exact file, where dozens of antivirus engines check it.
+- **Checksum.** Each release lists the file's SHA-256, which is also in `SHA256SUMS.txt`. To check your copy, run `Get-FileHash .\TempMonitor.exe` in PowerShell and compare.
+- **Nothing hidden.** No ads and no telemetry. It only goes online to download the PawnIO installer when you ask, and checks that installer against a pinned checksum before running it.
+
+**About the SmartScreen warning:** Windows shows "Windows protected your PC" for apps that aren't code-signed or that few people have downloaded yet. It means Microsoft doesn't know the publisher, not that anything was found in the file.
 
 ### First run
 
 1. **Windows asks for administrator permission.** Click **Yes**. Reading CPU and motherboard sensors requires low-level hardware access, so every hardware monitor (HWiNFO, HWMonitor, LibreHardwareMonitor) needs admin rights.
-2. **SmartScreen may warn about an unrecognized app** because the exe isn't code-signed. Click **More info → Run anyway**.
+2. **SmartScreen may warn about an unrecognized app** because the exe isn't code-signed. Click **More info → Run anyway** (see [Is it safe?](#is-it-safe)).
 3. **CPU temperatures need the PawnIO driver.** If it isn't installed, a yellow bar offers to install it. Temp Monitor downloads the official PawnIO installer, checks it against a known checksum, and runs it. GPU and drive temperatures work without it.
 
 ## What "Warm" and "Hot" mean
@@ -71,9 +81,9 @@ At idle, most desktop CPUs sit around 30–50 °C and laptop CPUs around 40–60
 
 Graphics cards usually run around 30–50 °C at idle and 65–85 °C while gaming; the "hot spot" sensor reads about 10 °C higher than the core. NVMe and SATA SSDs are normally 30–50 °C, and many slow down to protect themselves at around 70–80 °C.
 
-### Why does it need administrator rights? Is it safe?
+### Why does it need administrator rights?
 
-Reading CPU and motherboard sensors means talking to the hardware directly, which Windows only allows for administrators, so HWiNFO, HWMonitor and LibreHardwareMonitor need admin rights too. Temp Monitor is open source and every release is built by [GitHub Actions](.github/workflows/build.yml) from this repository, with a SHA-256 checksum. It doesn't connect to the internet, except to download the PawnIO installer if you ask it to, and has no ads or telemetry.
+Reading CPU and motherboard sensors means talking to the hardware directly, which Windows only allows for administrators, so HWiNFO, HWMonitor and LibreHardwareMonitor need admin rights too. To check that the download itself is safe, see [Is it safe?](#is-it-safe).
 
 ### Why are my CPU temperatures missing?
 

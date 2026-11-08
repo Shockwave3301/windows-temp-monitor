@@ -2,7 +2,9 @@ name: Build
 
 # Every push and pull request builds the exe and keeps it as a workflow artifact.
 # Pushing a tag like v1.2.0 also publishes a GitHub Release with the exe and its SHA-256
-# (or attaches them to that tag's release if one was already created on GitHub).
+# (or attaches them to that tag's release if one was already created on GitHub). The release
+# notes say how to verify the download: the checksum, a signed build provenance attestation,
+# and a VirusTotal scan if the VT_API_KEY repository secret is set.
 on:
   push:
     branches: [main]
@@ -11,7 +13,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write      # publish releases
+  id-token: write      # sign the build provenance attestation
+  attestations: write  # store the attestation on GitHub
 
 jobs:
   build:
@@ -38,6 +42,7 @@ jobs:
         run: dotnet build TempMonitor.csproj -c Release -p:Version=${{ steps.version.outputs.value }}
 
       - name: Prepare files
+        id: files
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
@@ -45,11 +50,44 @@ jobs:
           $hash = (Get-FileHash dist/TempMonitor.exe -Algorithm SHA256).Hash.ToLower()
           "$hash  TempMonitor.exe" | Out-File -Encoding ascii dist/SHA256SUMS.txt
           Get-Content dist/SHA256SUMS.txt
+          "sha256=$hash" >> $env:GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v7
         with:
           name: TempMonitor
           path: dist/
+
+      # Signed proof that this exe was built by this workflow from this repository's source.
+      # Anyone can check it with: gh attestation verify TempMonitor.exe --repo <owner>/<repo>
+      - name: Attest build provenance
+        id: attest
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/TempMonitor.exe
+
+      # Uploads the exe to VirusTotal so the release notes can link to its scan. Needs a free
+      # VirusTotal API key in the VT_API_KEY repository secret; without one, or if VirusTotal
+      # is down, the release is published without the link.
+      - name: Scan with VirusTotal
+        id: virustotal
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+          SHA256: ${{ steps.files.outputs.sha256 }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          if (-not $env:VT_API_KEY) {
+            Write-Output '::notice::No VT_API_KEY secret, so the release notes will not link to a VirusTotal scan.'
+            exit 0
+          }
+          $response = curl.exe --silent --show-error --fail-with-body --request POST --header "x-apikey: $env:VT_API_KEY" --form 'file=@dist/TempMonitor.exe' https://www.virustotal.com/api/v3/files
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output "::warning::VirusTotal upload failed, so the release notes will not link to a scan: $response"
+            exit 0
+          }
+          "url=https://www.virustotal.com/gui/file/$env:SHA256" >> $env:GITHUB_OUTPUT
 
       # Attaches the files to the tag's release, creating the release if it doesn't exist yet
       # (it may already exist if it was drafted on GitHub before the tag was pushed).
@@ -59,21 +97,66 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          SHA256: ${{ steps.files.outputs.sha256 }}
+          ATTESTATION_URL: ${{ steps.attest.outputs.attestation-url }}
+          VT_URL: ${{ steps.virustotal.outputs.url }}
         run: |
           $PSNativeCommandUseErrorActionPreference = $false
+          $repoUrl = "https://github.com/$env:GITHUB_REPOSITORY"
+          $commit = $env:GITHUB_SHA.Substring(0, 7)
+
+          # "Verify this download" section. The markers let a re-run replace it instead of adding another.
+          $verify = @(
+            '<!-- verify -->'
+            '### Verify this download'
+            ''
+            "- **Built by GitHub Actions** from the public source code at commit [$commit]($repoUrl/commit/$env:GITHUB_SHA), not on anyone's PC."
+          )
+          if ($env:VT_URL) {
+            $verify += "- **VirusTotal:** [scan results for this exact file]($env:VT_URL)"
+          }
+          $verify += "- **SHA-256:** ``$env:SHA256``. To check your copy, run ``Get-FileHash .\TempMonitor.exe`` in PowerShell and compare."
+          if ($env:ATTESTATION_URL) {
+            $verify += "- **Build provenance:** a [signed attestation]($env:ATTESTATION_URL) proves this file came from this repository's workflow. With the GitHub CLI: ``gh attestation verify TempMonitor.exe --repo $env:GITHUB_REPOSITORY``"
+          }
+          $verify += '<!-- /verify -->'
+          $verify = $verify -join "`n"
+          $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+
           gh release view $env:TAG *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $env:TAG dist/TempMonitor.exe dist/SHA256SUMS.txt --clobber
-          } else {
-            # A short description for people (and search engines) landing on the release page.
-            # GitHub puts the generated changelog after it.
-            $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
-            @(
-              'Temp Monitor is a free, portable app that shows live CPU, GPU, SSD, motherboard and RAM temperatures on Windows 10 and 11.'
-              ''
-              '**Download `TempMonitor.exe` below and run it.** There is nothing to install. Click **Yes** when Windows asks for administrator permission; first-run steps are in the [README](https://github.com/' + $env:GITHUB_REPOSITORY + '#first-run).'
-              ''
-            ) | Set-Content -Encoding utf8 $notes
-            gh release create $env:TAG dist/TempMonitor.exe dist/SHA256SUMS.txt --title "Temp Monitor $env:TAG" --notes-file $notes --generate-notes
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+            # The release was written on GitHub, so keep its text and add (or refresh) the verify section.
+            $body = (gh release view $env:TAG --json body --jq .body) -join "`n"
+            if ($LASTEXITCODE -ne 0) {
+              Write-Output '::warning::The files were uploaded, but the release notes could not be read to add the verify section.'
+              exit 0
+            }
+            $pattern = '(?s)<!-- verify -->.*?<!-- /verify -->'
+            if ($body -match $pattern) {
+              $body = $body -replace $pattern, { $verify }
+            } else {
+              $body = $body.TrimEnd() + "`n`n" + $verify
+            }
+            Set-Content -Encoding utf8 $notes $body
+            gh release edit $env:TAG --notes-file $notes
+            if ($LASTEXITCODE -ne 0) {
+              Write-Output '::warning::The files were uploaded, but the verify section could not be added to the release notes.'
+            }
+            exit 0
           }
+
+          # A short description for people (and search engines) landing on the release page,
+          # then the verify section. GitHub puts the generated changelog after it.
+          @(
+            'Temp Monitor is a free, portable app that shows live CPU, GPU, SSD, motherboard and RAM temperatures on Windows 10 and 11.'
+            ''
+            "**Download ``TempMonitor.exe`` below and run it.** There is nothing to install. Click **Yes** when Windows asks for administrator permission; first-run steps are in the [README]($repoUrl#first-run)."
+            ''
+            $verify
+            ''
+          ) | Set-Content -Encoding utf8 $notes
+          gh release create $env:TAG dist/TempMonitor.exe dist/SHA256SUMS.txt --title "Temp Monitor $env:TAG" --notes-file $notes --generate-notes
           exit $LASTEXITCODE

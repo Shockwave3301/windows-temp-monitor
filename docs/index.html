@@ -141,6 +141,7 @@
   .steps li { counter-increment: step; }
   .steps li::before { content: counter(step); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-weight: 700; margin-bottom: 14px; }
   .callout { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 16px 20px; margin: 0; }
+  .grid + .callout { margin-top: 20px; }
 
   .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px; }
   table { width: 100%; border-collapse: collapse; font-size: 16px; }
@@ -179,6 +180,7 @@
     <a class="brand" href="./"><img src="icon.png" alt="" width="32" height="32">Temp Monitor</a>
     <nav aria-label="Main">
       <a class="opt" href="#features">Features</a>
+      <a class="opt" href="#safety">Safety</a>
       <a class="opt" href="#faq">FAQ</a>
       <a href="https://github.com/Shockwave3301/windows-temp-monitor">GitHub</a>
     </nav>
@@ -194,7 +196,7 @@
           <a class="btn btn-primary" href="https://github.com/Shockwave3301/windows-temp-monitor/releases/latest/download/TempMonitor.exe">Download for Windows<small>TempMonitor.exe · 1.8 MB · 64-bit</small></a>
           <a class="btn btn-secondary" href="https://github.com/Shockwave3301/windows-temp-monitor">View source on GitHub</a>
         </div>
-        <p class="note">No installer, no ads, no telemetry. Windows asks for administrator permission when it starts, as it does for every hardware monitor.</p>
+        <p class="note">No installer, no ads, no telemetry. Open source, built by GitHub and scanned by VirusTotal: <a href="#safety">see how to check it's safe</a>.</p>
       </div>
       <div class="shot">
         <img src="screenshot.png" width="600" height="1453" alt="Temp Monitor in dark mode: the summary says the processor is running warm, above cards for an Intel Core i5 CPU at 84 °C with per-core bars and an NVIDIA GeForce RTX 3050 GPU at 63 °C">
@@ -232,6 +234,38 @@
       </div>
     </section>
 
+    <section id="safety" aria-labelledby="safety-h">
+      <h2 id="safety-h">Safe to run, and you can check</h2>
+      <p class="intro">A temperature monitor needs administrator rights, so it's fair to ask whether you can trust it. You don't have to take it on faith.</p>
+      <div class="grid">
+        <div class="card">
+          <h3>Open source</h3>
+          <p>All of the code is <a href="https://github.com/Shockwave3301/windows-temp-monitor">public on GitHub</a>, so anyone can read exactly what the app does.</p>
+        </div>
+        <div class="card">
+          <h3>Built by GitHub, not on a PC</h3>
+          <p>Releases are compiled by GitHub Actions straight from the public source, with a <a href="https://github.com/Shockwave3301/windows-temp-monitor/attestations">signed attestation</a> that proves where each exe came from.</p>
+        </div>
+        <div class="card">
+          <h3>Scanned by VirusTotal</h3>
+          <p>Each <a href="https://github.com/Shockwave3301/windows-temp-monitor/releases/latest">release page</a> links to the VirusTotal report for that exact file, where dozens of antivirus engines check it.</p>
+        </div>
+        <div class="card">
+          <h3>A checksum you can verify</h3>
+          <p>Each release lists the file's SHA-256. Run <code>Get-FileHash .\TempMonitor.exe</code> in PowerShell to confirm your copy matches.</p>
+        </div>
+        <div class="card">
+          <h3>No ads, no tracking</h3>
+          <p>It only goes online to fetch the PawnIO installer when you ask, and checks that installer against a pinned checksum before running it.</p>
+        </div>
+        <div class="card">
+          <h3>Why it needs admin rights</h3>
+          <p>CPU and motherboard sensors need low-level hardware access, which Windows only allows for administrators. HWiNFO and HWMonitor ask for the same.</p>
+        </div>
+      </div>
+      <p class="callout"><strong>Seeing "Windows protected your PC"?</strong> SmartScreen shows this for apps that aren't code-signed or that few people have downloaded yet. It means Microsoft doesn't know the publisher, not that anything was found in the file. Click <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
+    </section>
+
     <section id="how-to" aria-labelledby="how-to-h">
       <h2 id="how-to-h">How to check your CPU temperature on Windows 11 or 10</h2>
       <p class="intro">Windows has no built-in way to show your CPU temperature; Task Manager only shows the temperature of a dedicated graphics card. With Temp Monitor it takes three steps.</p>
@@ -242,7 +276,7 @@
         </li>
         <li class="card">
           <h3>Run it and click Yes</h3>
-          <p>Reading hardware sensors needs administrator rights. If SmartScreen warns about an unrecognized app, click More info, then Run anyway; the exe isn't code-signed.</p>
+          <p>Reading hardware sensors needs administrator rights. If SmartScreen warns about an unrecognized app, click More info, then Run anyway; the exe isn't code-signed (<a href="#safety">why that's OK</a>).</p>
         </li>
         <li class="card">
           <h3>Install PawnIO when asked</h3>
@@ -274,11 +308,8 @@
     <section id="faq" aria-labelledby="faq-h">
       <h2 id="faq-h">Questions</h2>
       <div class="faq">
-        <h3>Is Temp Monitor free and safe?</h3>
-        <p>Yes. It's free and open source under the MIT license, with no ads, no account and no telemetry. The only time it goes online is to download the PawnIO installer, and only if you ask it to. Every release is built from the public source code by GitHub Actions and published with its SHA-256 checksum.</p>
-
-        <h3>Why does it need administrator rights?</h3>
-        <p>CPU and motherboard sensors can only be read with low-level hardware access, which Windows reserves for administrators. HWiNFO, HWMonitor and LibreHardwareMonitor ask for the same permission.</p>
+        <h3>Is Temp Monitor free?</h3>
+        <p>Yes. It's free and open source under the MIT license, with no ads, no account and no telemetry. To check that the download is safe, see <a href="#safety">Safe to run</a>.</p>
 
         <h3>What is PawnIO?</h3>
         <p><a href="https://pawnio.eu">PawnIO</a> is a signed, open-source driver that lets programs read CPU and motherboard sensors safely. It replaces the old WinRing0 driver, which Windows Defender now flags as vulnerable, and other monitoring tools use it too. You can uninstall it any time from Settings, Apps.</p>
