@@ -1,13 +1,13 @@
 # Temp Monitor: CPU, GPU and SSD temperature monitor for Windows
 
-[![Latest release](https://img.shields.io/github/v/release/Shockwave3301/windows_temp_monitor?label=release)](https://github.com/Shockwave3301/windows_temp_monitor/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/Shockwave3301/windows_temp_monitor/total)](https://github.com/Shockwave3301/windows_temp_monitor/releases)
+[![Latest release](https://img.shields.io/github/v/release/Shockwave3301/windows-temp-monitor?label=release)](https://github.com/Shockwave3301/windows-temp-monitor/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Shockwave3301/windows-temp-monitor/total)](https://github.com/Shockwave3301/windows-temp-monitor/releases)
 [![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4)](#requirements)
-[![License: MIT](https://img.shields.io/github/license/Shockwave3301/windows_temp_monitor)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/Shockwave3301/windows-temp-monitor)](LICENSE)
 
 **Temp Monitor** is a free, open-source app that shows live **CPU, GPU, SSD and hard drive, motherboard and RAM temperatures** on Windows 11 and Windows 10. It's portable: one 1.8 MB exe with no installer, no ads and no telemetry. A one-line summary tells you straight away whether your PC is running normal, warm or hot.
 
-**[Download TempMonitor.exe](https://github.com/Shockwave3301/windows_temp_monitor/releases/latest/download/TempMonitor.exe)** (latest release, 64-bit) · [Website](https://shockwave3301.github.io/windows_temp_monitor/)
+**[Download TempMonitor.exe](https://github.com/Shockwave3301/windows-temp-monitor/releases/latest/download/TempMonitor.exe)** (latest release, 64-bit) · [Website](https://shockwave3301.github.io/windows-temp-monitor/)
 
 <p align="center"><img src="docs/screenshot.png" alt="Temp Monitor in dark mode on Windows, showing Intel Core CPU package and per-core temperatures, NVIDIA GeForce GPU temperature and NVMe SSD temperature" width="420"></p>
 
@@ -23,7 +23,7 @@
 
 ## Download
 
-Download [`TempMonitor.exe`](https://github.com/Shockwave3301/windows_temp_monitor/releases/latest/download/TempMonitor.exe) from the [latest release](https://github.com/Shockwave3301/windows_temp_monitor/releases/latest) and run it. There's nothing to install; you can keep the file anywhere.
+Download [`TempMonitor.exe`](https://github.com/Shockwave3301/windows-temp-monitor/releases/latest/download/TempMonitor.exe) from the [latest release](https://github.com/Shockwave3301/windows-temp-monitor/releases/latest) and run it. There's nothing to install; you can keep the file anywhere.
 
 Each release also lists the file's SHA-256 checksum in `SHA256SUMS.txt`.
 
@@ -61,7 +61,7 @@ GPU "hot spot" and memory "junction" sensors normally run about 10 °C above the
 
 ### How do I check my CPU temperature on Windows 11 or 10?
 
-Windows doesn't show CPU temperature anywhere built in; Task Manager only shows the temperature of a dedicated graphics card. Download [`TempMonitor.exe`](https://github.com/Shockwave3301/windows_temp_monitor/releases/latest/download/TempMonitor.exe), run it, click **Yes** when Windows asks for administrator permission, and install PawnIO when the yellow bar offers it. The big number on the Processor card is your CPU temperature: "CPU Package" on Intel, "Core (Tctl/Tdie)" on AMD Ryzen.
+Windows doesn't show CPU temperature anywhere built in; Task Manager only shows the temperature of a dedicated graphics card. Download [`TempMonitor.exe`](https://github.com/Shockwave3301/windows-temp-monitor/releases/latest/download/TempMonitor.exe), run it, click **Yes** when Windows asks for administrator permission, and install PawnIO when the yellow bar offers it. The big number on the Processor card is your CPU temperature: "CPU Package" on Intel, "Core (Tctl/Tdie)" on AMD Ryzen.
 
 ### What is a normal CPU temperature?
 
@@ -77,7 +77,7 @@ Reading CPU and motherboard sensors means talking to the hardware directly, whic
 
 ### Why are my CPU temperatures missing?
 
-CPU and motherboard temperatures need the [PawnIO](#about-pawnio) driver; if it isn't installed, a yellow bar at the top of the window offers to install it. Virtual machines don't expose temperature sensors, and very new or unusual hardware may not be recognised yet. If something is missing, run `TempMonitor.exe --dump temps.txt` (see [Command line](#command-line)) and attach the file to an [issue](https://github.com/Shockwave3301/windows_temp_monitor/issues).
+CPU and motherboard temperatures need the [PawnIO](#about-pawnio) driver; if it isn't installed, a yellow bar at the top of the window offers to install it. Virtual machines don't expose temperature sensors, and very new or unusual hardware may not be recognised yet. If something is missing, run `TempMonitor.exe --dump temps.txt` (see [Command line](#command-line)) and attach the file to an [issue](https://github.com/Shockwave3301/windows-temp-monitor/issues).
 
 ### How is it different from HWiNFO, HWMonitor or Core Temp?
 
