@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Temp Monitor: free CPU &amp; GPU temperature monitor for Windows</title>
+<meta name="description" content="Check your CPU, GPU and SSD temperatures on Windows 11 and 10. Temp Monitor is free, open source and portable: one small exe, no installer, no ads.">
+<link rel="canonical" href="https://shockwave3301.github.io/windows_temp_monitor/">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#f3f3f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#202020" media="(prefers-color-scheme: dark)">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Temp Monitor">
+<meta property="og:title" content="Temp Monitor: free CPU &amp; GPU temperature monitor for Windows">
+<meta property="og:description" content="Live CPU, GPU, SSD, motherboard and RAM temperatures on Windows 10 and 11. One small exe, no installer.">
+<meta property="og:url" content="https://shockwave3301.github.io/windows_temp_monitor/">
+<meta property="og:image" content="https://shockwave3301.github.io/windows_temp_monitor/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Temp Monitor showing CPU core temperatures, with the tagline: CPU, GPU and SSD temperatures for Windows 10 and 11">
+<meta name="twitter:card" content="summary_large_image">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Temp Monitor",
+  "description": "A free, portable temperature monitor for Windows 10 and 11 that shows live CPU, GPU, SSD, motherboard and RAM temperatures and says whether each device is running normal, warm or hot.",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Windows 10, Windows 11",
+  "url": "https://shockwave3301.github.io/windows_temp_monitor/",
+  "downloadUrl": "https://github.com/Shockwave3301/windows_temp_monitor/releases/latest/download/TempMonitor.exe",
+  "fileSize": "1.8 MB",
+  "screenshot": "https://shockwave3301.github.io/windows_temp_monitor/screenshot.png",
+  "image": "https://shockwave3301.github.io/windows_temp_monitor/icon.png",
+  "license": "https://opensource.org/license/mit",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "Shockwave3301", "url": "https://github.com/Shockwave3301" },
+  "sameAs": "https://github.com/Shockwave3301/windows_temp_monitor"
+}
+</script>
+
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f3f3f3;
+    --surface: #ffffff;
+    --border: #e5e5e5;
+    --text: #1b1b1b;
+    --muted: #616161;
+    --accent: #005fb8;
+    --accent-hover: #0067c0;
+    --on-accent: #ffffff;
+    --normal: #0f7b0f;
+    --warm: #b65b00;
+    --hot: #c42b1c;
+    --chip: rgba(0, 0, 0, .05);
+    --shadow: 0 8px 28px rgba(0, 0, 0, .10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #202020;
+      --surface: #2b2b2b;
+      --border: #3a3a3a;
+      --text: #ffffff;
+      --muted: #a8a8a8;
+      --accent: #60cdff;
+      --accent-hover: #7fd6ff;
+      --on-accent: #002a3d;
+      --normal: #6ccb5f;
+      --warm: #ffb547;
+      --hot: #ff6b5e;
+      --chip: rgba(255, 255, 255, .06);
+      --shadow: 0 10px 34px rgba(0, 0, 0, .45);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  h1, h2, h3 { font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; line-height: 1.2; }
+  a { color: var(--accent); }
+  a:hover { color: var(--accent-hover); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  img { max-width: 100%; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  @media (max-width: 600px) { .wrap { padding: 0 16px; } }
+
+  /* Header */
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 600; font-size: 18px; }
+  .brand img { width: 32px; height: 32px; }
+  .top nav { display: flex; gap: 22px; font-size: 15px; }
+  .top nav a { color: var(--muted); text-decoration: none; }
+  .top nav a:hover { color: var(--text); }
+  @media (max-width: 600px) { .top nav .opt { display: none; } }
+
+  /* Hero */
+  .hero { display: grid; grid-template-columns: 1fr 380px; gap: 56px; align-items: center; padding: 40px 0 72px; }
+  .eyebrow { display: inline-block; font-size: 14px; color: var(--muted); background: var(--chip); border: 1px solid var(--border); border-radius: 999px; padding: 3px 12px; margin-bottom: 18px; }
+  .hero h1 { font-size: clamp(34px, 5vw, 52px); font-weight: 700; letter-spacing: -0.02em; margin: 0 0 18px; }
+  .lead { font-size: 19px; color: var(--muted); margin: 0 0 30px; max-width: 34em; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn { display: inline-flex; flex-direction: column; justify-content: center; min-height: 52px; padding: 8px 22px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 17px; line-height: 1.25; border: 1px solid transparent; }
+  .btn small { font-weight: 400; font-size: 13px; opacity: .85; }
+  .btn-primary { background: var(--accent); color: var(--on-accent); }
+  .btn-primary:hover { background: var(--accent-hover); color: var(--on-accent); }
+  .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+  .btn-secondary:hover { color: var(--text); border-color: var(--muted); }
+  .note { font-size: 14px; color: var(--muted); margin: 18px 0 0; max-width: 36em; }
+  .shot { position: relative; max-height: 600px; overflow: hidden; border-radius: 12px; border: 1px solid #3a3a3a; background: #202020; box-shadow: var(--shadow); }
+  .shot img { display: block; width: 100%; height: auto; }
+  .shot::after { content: ""; position: absolute; inset: auto 0 0 0; height: 90px; background: linear-gradient(rgba(32, 32, 32, 0), #202020); }
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; gap: 40px; padding-top: 24px; }
+    .shot { max-width: 400px; max-height: 520px; }
+  }
+
+  /* Sections */
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  section h2 { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700; letter-spacing: -0.01em; margin: 0 0 12px; }
+  .intro { color: var(--muted); font-size: 17px; margin: 0 0 32px; max-width: 42em; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 22px; }
+  .card h3 { font-size: 18px; margin: 0 0 8px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  .steps { list-style: none; padding: 0; margin: 0 0 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: step; }
+  @media (max-width: 860px) { .steps { grid-template-columns: 1fr; } }
+  .steps li { counter-increment: step; }
+  .steps li::before { content: counter(step); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-weight: 700; margin-bottom: 14px; }
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 16px 20px; margin: 0; }
+
+  .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 16px; }
+  th, td { text-align: left; padding: 13px 20px; border-bottom: 1px solid var(--border); }
+  td + td, th + th { white-space: nowrap; }
+  @media (max-width: 600px) { th, td { padding: 12px 14px; } }
+  tr:last-child td { border-bottom: 0; }
+  th { font-size: 14px; color: var(--muted); font-weight: 600; }
+  .pill { display: inline-block; font-size: 13px; font-weight: 600; padding: 1px 10px; border-radius: 999px; margin-right: 6px; }
+  .pill.normal { color: var(--normal); background: color-mix(in srgb, var(--normal) 16%, transparent); }
+  .pill.warm { color: var(--warm); background: color-mix(in srgb, var(--warm) 16%, transparent); }
+  .pill.hot { color: var(--hot); background: color-mix(in srgb, var(--hot) 16%, transparent); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 0 0 20px; color: var(--muted); font-size: 15px; }
+  .legend > span { white-space: nowrap; }
+  .muted { color: var(--muted); }
+
+  .faq { max-width: 46em; }
+  .faq h3 { font-size: 19px; margin: 30px 0 8px; }
+  .faq h3:first-of-type { margin-top: 8px; }
+  .faq p { margin: 0; color: var(--muted); }
+
+  .cta { text-align: center; }
+  .cta .intro { margin-left: auto; margin-right: auto; }
+  .cta .actions { justify-content: center; }
+  .cta .note { margin: 18px auto 0; }
+
+  footer { border-top: 1px solid var(--border); padding: 28px 0 40px; font-size: 14px; color: var(--muted); }
+  footer .links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 10px; }
+  footer p { margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="./"><img src="icon.png" alt="" width="32" height="32">Temp Monitor</a>
+    <nav aria-label="Main">
+      <a class="opt" href="#features">Features</a>
+      <a class="opt" href="#faq">FAQ</a>
+      <a href="https://github.com/Shockwave3301/windows_temp_monitor">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div>
+        <span class="eyebrow">Windows 10 and 11 · Free and open source</span>
+        <h1>Free CPU, GPU and SSD temperature monitor for Windows</h1>
+        <p class="lead">See every temperature sensor in your PC in one small window, with a one-line answer to the question that matters: is anything running too hot?</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="https://github.com/Shockwave3301/windows_temp_monitor/releases/latest/download/TempMonitor.exe">Download for Windows<small>TempMonitor.exe · 1.8 MB · 64-bit</small></a>
+          <a class="btn btn-secondary" href="https://github.com/Shockwave3301/windows_temp_monitor">View source on GitHub</a>
+        </div>
+        <p class="note">No installer, no ads, no telemetry. Windows asks for administrator permission when it starts, as it does for every hardware monitor.</p>
+      </div>
+      <div class="shot">
+        <img src="screenshot.png" width="600" height="1453" alt="Temp Monitor in dark mode: the summary says the processor is running warm, above cards for an Intel Core i5 CPU at 84 °C with per-core bars and an NVIDIA GeForce RTX 3050 GPU at 63 °C">
+      </div>
+    </div>
+
+    <section id="features" aria-labelledby="features-h">
+      <h2 id="features-h">Is my PC running hot? One look tells you</h2>
+      <p class="intro">Most hardware monitors show hundreds of numbers. Temp Monitor shows only temperatures, grouped by device, and tells you in plain words what they mean.</p>
+      <div class="grid">
+        <div class="card">
+          <h3>A plain-English answer</h3>
+          <p>The top line reads "All temperatures are normal", or names the device that's running warm or hot along with its hottest reading.</p>
+        </div>
+        <div class="card">
+          <h3>Every sensor, grouped by device</h3>
+          <p>CPU package and every core, GPU core and hot spot, NVMe and SATA drives, motherboard, and DDR5 memory where supported.</p>
+        </div>
+        <div class="card">
+          <h3>Limits that fit each device</h3>
+          <p>80 °C is warm for a processor but hot for an SSD. Each card is judged against limits for its own kind of hardware.</p>
+        </div>
+        <div class="card">
+          <h3>Trends, not just a number</h3>
+          <p>Readings update every second. A 2-minute trend line and the session's lowest and highest values show whether a temperature is climbing or settling.</p>
+        </div>
+        <div class="card">
+          <h3>Tiny and portable</h3>
+          <p>One 1.8 MB file with nothing to install. It runs on .NET Framework 4.8, which is already part of Windows 10 and 11.</p>
+        </div>
+        <div class="card">
+          <h3>Fits in with Windows</h3>
+          <p>Follows your light, dark or High Contrast setting. Switch between °C and °F, keep it always on top, and copy all readings to the clipboard.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="how-to" aria-labelledby="how-to-h">
+      <h2 id="how-to-h">How to check your CPU temperature on Windows 11 or 10</h2>
+      <p class="intro">Windows has no built-in way to show your CPU temperature; Task Manager only shows the temperature of a dedicated graphics card. With Temp Monitor it takes three steps.</p>
+      <ol class="steps">
+        <li class="card">
+          <h3>Download TempMonitor.exe</h3>
+          <p>Save it anywhere you like. There's nothing to install and nothing to uninstall later.</p>
+        </li>
+        <li class="card">
+          <h3>Run it and click Yes</h3>
+          <p>Reading hardware sensors needs administrator rights. If SmartScreen warns about an unrecognized app, click More info, then Run anyway; the exe isn't code-signed.</p>
+        </li>
+        <li class="card">
+          <h3>Install PawnIO when asked</h3>
+          <p>CPU and motherboard sensors need the free, signed PawnIO driver. A yellow bar offers to install it, and the installer is checked against a known checksum first.</p>
+        </li>
+      </ol>
+      <p class="callout">Your CPU temperature is the large number on the <strong>Processor</strong> card: "CPU Package" on Intel processors, "Core (Tctl/Tdie)" on AMD Ryzen. GPU and drive temperatures appear even without PawnIO.</p>
+    </section>
+
+    <section id="limits" aria-labelledby="limits-h">
+      <h2 id="limits-h">What temperature is too hot?</h2>
+      <p class="intro">Each device's label follows its main reading: CPU package, GPU core, drive composite temperature and so on. These are the limits Temp Monitor uses.</p>
+      <p class="legend"><span><span class="pill normal">Normal</span>below the warm limit</span><span><span class="pill warm">Warm</span>from the warm limit</span><span><span class="pill hot">Hot</span>from the hot limit</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Device</th><th scope="col">Warm from</th><th scope="col">Hot from</th></tr></thead>
+          <tbody>
+            <tr><td>Processor (CPU)</td><td>80 °C</td><td>90 °C</td></tr>
+            <tr><td>Graphics card (GPU)</td><td>75 °C</td><td>85 °C</td></tr>
+            <tr><td>Drive (SSD or hard drive)</td><td>55 °C</td><td>70 °C</td></tr>
+            <tr><td>Memory (RAM)</td><td>60 °C</td><td>75 °C</td></tr>
+            <tr><td>Motherboard and other</td><td>60 °C</td><td>80 °C</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">GPU hot spot and memory junction sensors normally read about 10 °C above the core, so their limits are 10 °C higher. These are general guides rather than manufacturer limits: a laptop CPU at 85 °C during a game is usually fine, but the same temperature while the PC is idle is worth a look.</p>
+    </section>
+
+    <section id="faq" aria-labelledby="faq-h">
+      <h2 id="faq-h">Questions</h2>
+      <div class="faq">
+        <h3>Is Temp Monitor free and safe?</h3>
+        <p>Yes. It's free and open source under the MIT license, with no ads, no account and no telemetry. The only time it goes online is to download the PawnIO installer, and only if you ask it to. Every release is built from the public source code by GitHub Actions and published with its SHA-256 checksum.</p>
+
+        <h3>Why does it need administrator rights?</h3>
+        <p>CPU and motherboard sensors can only be read with low-level hardware access, which Windows reserves for administrators. HWiNFO, HWMonitor and LibreHardwareMonitor ask for the same permission.</p>
+
+        <h3>What is PawnIO?</h3>
+        <p><a href="https://pawnio.eu">PawnIO</a> is a signed, open-source driver that lets programs read CPU and motherboard sensors safely. It replaces the old WinRing0 driver, which Windows Defender now flags as vulnerable, and other monitoring tools use it too. You can uninstall it any time from Settings, Apps.</p>
+
+        <h3>Which hardware does it support?</h3>
+        <p>Temp Monitor reads sensors through LibreHardwareMonitorLib, so it works with most Intel Core and AMD Ryzen processors, NVIDIA and AMD graphics cards, NVMe and SATA drives, and many motherboards, in laptops and desktops. Virtual machines don't expose temperature sensors.</p>
+
+        <h3>Why are my CPU temperatures missing?</h3>
+        <p>Usually because PawnIO isn't installed yet; use the yellow bar at the top of the window to install it. If readings are still missing, run <code>TempMonitor.exe --dump temps.txt</code> and attach the file to a <a href="https://github.com/Shockwave3301/windows_temp_monitor/issues">GitHub issue</a>.</p>
+
+        <h3>How is it different from HWiNFO, HWMonitor or Core Temp?</h3>
+        <p>HWiNFO and HWMonitor show every sensor, including voltages, fan speeds, clocks and power, which is ideal for in-depth troubleshooting. Core Temp focuses on the processor. Temp Monitor covers the temperatures of your CPU, graphics card, drives, motherboard and memory, and keeps the screen simple enough to read in a second.</p>
+      </div>
+    </section>
+
+    <section class="cta" aria-labelledby="cta-h">
+      <h2 id="cta-h">Check your PC's temperatures now</h2>
+      <p class="intro">Download it, run it, and you'll know in seconds whether anything is running hot.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="https://github.com/Shockwave3301/windows_temp_monitor/releases/latest/download/TempMonitor.exe">Download for Windows<small>TempMonitor.exe · 1.8 MB · 64-bit</small></a>
+      </div>
+      <p class="note">Requires Windows 10 version 1903 or newer, or Windows 11, on a 64-bit PC.</p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="links">
+      <a href="https://github.com/Shockwave3301/windows_temp_monitor">Source code</a>
+      <a href="https://github.com/Shockwave3301/windows_temp_monitor/releases">All releases</a>
+      <a href="https://github.com/Shockwave3301/windows_temp_monitor/issues">Report a problem</a>
+      <a href="https://github.com/Shockwave3301/windows_temp_monitor/blob/main/THIRD-PARTY-NOTICES.md">Third-party notices</a>
+    </div>
+    <p>Temp Monitor is open source under the MIT license. Sensor access is provided by <a href="https://github.com/LibreHardwareMonitor/LibreHardwareMonitor">LibreHardwareMonitorLib</a>.</p>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -7,7 +7,7 @@
 
 **Temp Monitor** is a free, open-source app that shows live **CPU, GPU, SSD and hard drive, motherboard and RAM temperatures** on Windows 11 and Windows 10. It's portable: one 1.8 MB exe with no installer, no ads and no telemetry. A one-line summary tells you straight away whether your PC is running normal, warm or hot.
 
-**[Download TempMonitor.exe](https://github.com/Shockwave3301/windows_temp_monitor/releases/latest/download/TempMonitor.exe)** (latest release, 64-bit)
+**[Download TempMonitor.exe](https://github.com/Shockwave3301/windows_temp_monitor/releases/latest/download/TempMonitor.exe)** (latest release, 64-bit) · [Website](https://shockwave3301.github.io/windows_temp_monitor/)
 
 <p align="center"><img src="docs/screenshot.png" alt="Temp Monitor in dark mode on Windows, showing Intel Core CPU package and per-core temperatures, NVIDIA GeForce GPU temperature and NVMe SSD temperature" width="420"></p>
 
@@ -135,6 +135,7 @@ git push origin v1.0.0
 | `Settings.cs` | Saves preferences in `HKCU\Software\TempMonitor` |
 | `Program.cs` | Entry point, error handling, `--dump` |
 | `app.manifest` | Admin rights, DPI awareness, Windows 10/11 compatibility |
+| `docs/` | Website (published with GitHub Pages from `main` / `docs`), README screenshot, social preview image |
 
 ## License
 
